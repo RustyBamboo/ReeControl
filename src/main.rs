@@ -45,7 +45,7 @@ impl Sub {
         let apply_acc = Translation3::new(a[0] as f32, a[1] as f32, a[2] as f32);
         self.velocity.vector += self.acceleration.vector + apply_acc.vector;
         self.position.vector += drag.velocity * self.velocity.vector;
-        self.c.set_local_translation(self.position);
+
 
         let axis_vec = Vector3::new(a[3] as f32, a[4] as f32, a[5] as f32); 
         let axis_vec_norm = axis_vec.magnitude();
@@ -55,13 +55,16 @@ impl Sub {
         // Only apply rotation if significant torque
         if axis_vec_norm.abs() > 0.0001 { 
             let axis_vec_normed = na::Unit::new_unchecked(axis_vec / axis_vec_norm);
-            apply_ang_acc = na::UnitQuaternion::from_axis_angle(&axis_vec_normed, axis_vec_norm);
+            apply_ang_acc = na::UnitQuaternion::from_axis_angle(&axis_vec_normed, axis_vec_norm*0.001);
         }
         
         self.angular_velocity *= self.angular_acceleration * apply_ang_acc;
         self.angular_position *= self.angular_velocity;
 
-        self.c.set_local_rotation(self.angular_position);
+        //self.c.set_local_rotation(self.angular_position);
+        //self.c.append_translation(&self.position);
+        let iso = na::Isometry3::from_parts(self.position, self.angular_position);
+        self.c.append_transformation(&iso);
     }
     fn update_camera(&mut self, camera: &mut ArcBall) {
         camera.set_at(Point3::new(self.position.vector.x, self.position.vector.y, self.position.vector.z));
@@ -85,7 +88,7 @@ fn main() {
     let mut sub = Sub::new(&mut window);
     sub.acceleration = Translation3::new(0.0001, 0.0, 0.0);
     
-    let drag = Drag {velocity:0.1, angular_velocity:0.001};
+    let drag = Drag {velocity:0.001, angular_velocity:0.01};
 
     let b_matrix = control::get_b_matrix();
     println!("B Matrix: {}", b_matrix);
@@ -100,5 +103,4 @@ fn main() {
          sub.update_camera(&mut camera);
          draw_grid(&mut window);
     }
-
 }

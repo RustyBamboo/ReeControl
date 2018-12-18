@@ -4,6 +4,9 @@ use std::collections::HashMap;
 extern crate nalgebra as na;
 use na::{Vector3, Matrix};
 
+/* Helper structs for thruster_mapper.yaml
+ * Mostly temporary to test code
+ */
 #[derive(Deserialize)]
 struct ThrusterYaml {
      thruster_ports: Vec<Value>,
@@ -36,7 +39,10 @@ pub fn get_b_matrix() -> na::MatrixMN<f64, na::U6, na::U8> {
     let mut cols = Vec::new();
     let mut bounds = Vec::new();
 
-    for (name, value) in yaml.thrusters.iter() {
+    let thruster_order = vec!["FLH", "FLV", "FRH", "FRV", "BLH", "BLV", "BRH", "BRV"];
+
+    for name in thruster_order.iter() {
+        let value = yaml.thrusters.get::<str>(name).unwrap();
         println!("Thruster: {}, position: {:#?}, direction: {:#?}, bounds: {:#?}", name, value.position, value.direction, value.thrust_bounds);
 
         let position = Vector3::new(value.position[0], value.position[1], value.position[2]);
