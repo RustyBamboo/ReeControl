@@ -1,0 +1,12 @@
+[package]
+name = "ree"
+version = "0.1.0"
+authors = ["RustyBamboo <dvolya@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+kiss3d = "0.16"
+nalgebra = "*"
+serde = "1.0"
+serde_yaml = "0.8"
+serde_derive = "*"
