@@ -42,7 +42,7 @@ struct Sub {
 
 impl Sub {
     // Update object by integrating linear and angular components
-    fn update(&mut self, drag:&Drag, a:Vector6<f64>) -> () {
+    fn update(&mut self, drag:&Drag, a:Vector6<f32>) -> () {
         // Apply linear acceleration
         let apply_acc = Translation3::new(a[0] as f32, a[1] as f32, a[2] as f32);
         self.velocity.vector += self.acceleration.vector + self.angular_position.to_rotation_matrix() * apply_acc.vector;
@@ -68,8 +68,13 @@ impl Sub {
         let iso = na::Isometry3::from_parts(self.position, self.angular_position);
         self.c.set_local_transformation(iso);
     }
+
+    fn get_current(&self) -> (Vector3<f32>, Vector3<f32>, UnitQuaternion<f32>, Vector3<f32>) {
+        (self.position.vector, self.velocity.vector, self.angular_position, self.angular_velocity)
+    }
+
     fn update_camera(&mut self, camera: &mut ArcBall) {
-        camera.set_at(Point3::new(self.position.vector.x, self.position.vector.y, self.position.vector.z));
+        camera.set_at(Point3::new(self.position.vector.x as f32, self.position.vector.y as f32, self.position.vector.z as f32));
     }
 
     // Create new cube
@@ -89,21 +94,34 @@ fn main() {
     let mut camera = ArcBall::new(Point3::new(0.0, 2.0, -5.0), Point3::new(0.0, 0.0, 0.0)); 
 
     let mut sub = Sub::new(&mut window);
-    sub.acceleration = Translation3::new(0.0001, 0.0, 0.0);
+    //sub.acceleration = Translation3::new(0.0001, 0.0, 0.0);
     
     let drag = Drag {velocity:0.001, angular_velocity:0.001};
 
     let b_matrix = control::get_b_matrix();
     println!("B Matrix: {}", b_matrix);
-    let mut thrust :Vector8<f64> = Vector8::<f64>::repeat(0.0);
+    let mut thrust :Vector8<f32> = Vector8::<f32>::repeat(0.0);
     thrust[1] = 0.1; 
     println!("{}", thrust);
     let out = b_matrix * thrust;
     println!("{}", out);
 
+    let desired = (Vector3::identity() * 5.0,
+                   Vector3::identity() * 0.01,
+                   Vector3::identity() * 0.01,
+                   UnitQuaternion::<f32>::from_axis_angle(&Vector3::x_axis(), 0.5),
+                   Vector3::<f32>::identity(),
+                   Vector3::<f32>::identity());
+    
+    let mut pid = control::PID {error: Vector6::<f32>::zeros()};
+
     while window.render_with_camera(&mut camera) {
-         sub.update(&drag, out);
-         sub.update_camera(&mut camera);
-         draw_grid(&mut window);
+        let current = sub.get_current(); 
+        //TODO: Map using B matrix
+        let thrust = pid.pid_loop(current, desired); 
+        println!("{}",thrust);
+        sub.update(&drag, thrust);
+        sub.update_camera(&mut camera);
+        draw_grid(&mut window);
     }
 }
