@@ -13,7 +13,7 @@ use na::{UnitQuaternion, Vector, Vector3, Vector6, Translation3, Point3};
 type Vector8<N> = na::VectorN<N, na::U8>;
 
 mod control;
-
+mod path_planner;
 
 fn draw_grid(window: &mut Window) {
     let size : f32 = 100.0;
@@ -88,6 +88,11 @@ impl Sub {
 
 fn main() {
     let mut window = Window::new("REESim");
+    let font = kiss3d::text::Font::new(std::path::Path::new("/usr/share/fonts/TTF/DejaVuSansMono.ttf"));
+    if !font.is_some() {
+        println!("oof");
+        return;
+    }
     window.set_light(Light::StickToCamera);
     draw_grid(&mut window);
 
@@ -96,7 +101,7 @@ fn main() {
     let mut sub = Sub::new(&mut window);
     //sub.acceleration = Translation3::new(0.0001, 0.0, 0.0);
     
-    let drag = Drag {velocity:0.001, angular_velocity:0.001};
+    let drag = Drag {velocity:0.00001, angular_velocity:0.00001};
 
     let b_matrix = control::get_b_matrix();
     println!("B Matrix: {}", b_matrix);
@@ -106,22 +111,44 @@ fn main() {
     let out = b_matrix * thrust;
     println!("{}", out);
 
-    let desired = (Vector3::identity() * 5.0,
+    let b_matrix_inv = b_matrix.pseudo_inverse(0.001);
+    println!("B Matrix Inverse: {}", b_matrix_inv);
+
+    let mut desired = (Vector3::identity() * 5.0,
                    Vector3::identity() * 0.01,
                    Vector3::identity() * 0.01,
                    UnitQuaternion::<f32>::from_axis_angle(&Vector3::x_axis(), 0.5),
                    Vector3::<f32>::identity(),
                    Vector3::<f32>::identity());
     
-    let mut pid = control::PID {error: Vector6::<f32>::zeros()};
+    let mut pid = control::PID {error: Vector6::<f32>::zeros(), last_error: Vector6::<f32>::zeros()};
+
+    let path = path_planner::get_winding_path();
+    let mut step = 0.0;
+
+    let mut path_cube = window.add_cube(0.2, 0.2, 0.2);
+    path_cube.set_color(0.0, 0.2, 1.0);
 
     while window.render_with_camera(&mut camera) {
+        desired.0 = path[step as usize]; 
+        println!("{}", desired.0);
+        desired.3 = UnitQuaternion::rotation_between(&Vector3::identity(), &desired.0).unwrap();
         let current = sub.get_current(); 
-        //TODO: Map using B matrix
-        let thrust = pid.pid_loop(current, desired); 
-        println!("{}",thrust);
+        let wrench = pid.pid_loop(current, desired); 
+        let thrust = b_matrix * (b_matrix_inv * wrench); 
+        println!("Thrusters: {}", b_matrix_inv * wrench);
+        println!("Required Acceleration: {}", thrust);
         sub.update(&drag, thrust);
         sub.update_camera(&mut camera);
         draw_grid(&mut window);
+
+        path_cube.set_local_translation(Translation3::new(desired.0[0], desired.0[1], desired.0[2]));
+        if (step as usize) < path.len() -1 {
+            step +=0.01;
+        }
+        else {
+            step = 0.0;
+        }
+        //window.draw_text(&text, &na::Point2::new(5.0, 5.0), 100.0, font.as_ref().unwrap(), &na::Point3::new(255.0, 0.0, 0.0));
     }
 }

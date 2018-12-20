@@ -57,7 +57,8 @@ pub fn get_b_matrix() -> na::MatrixMN<f32, na::U6, na::U8> {
 }
 
 pub struct PID {
-   pub error:na::Vector6<f32>
+   pub error:na::Vector6<f32>,
+   pub last_error: na::Vector6<f32>
 }
 impl PID {
 pub fn pid_loop(&mut self, current: (Vector3<f32>, Vector3<f32>, UnitQuaternion<f32>, Vector3<f32>) , desired: (Vector3<f32>, Vector3<f32>, Vector3<f32>, UnitQuaternion<f32>, Vector3<f32>, Vector3<f32>)) -> na::Vector6<f32> {
@@ -67,7 +68,13 @@ pub fn pid_loop(&mut self, current: (Vector3<f32>, Vector3<f32>, UnitQuaternion<
     let err_orientation = (d_orientation * c_orientation.inverse()).scaled_axis();
     let err_position_orientation = na::Vector6::new(err_position[0], err_position[1], err_position[2], err_orientation[0], err_orientation[1], err_orientation[2]);
     self.error += err_position_orientation;
+    let derv_error = err_position_orientation - self.last_error;
+    self.last_error = err_position_orientation;
 
-    return 0.001 * err_position_orientation + 0.00001 * self.error;
+    let kp = na::Vector6::new(0.01, 0.01, 0.01, 100.0, 0.1, 0.1);
+    let ki = na::Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    let kd = na::Vector6::new(1000.0, 1000.0, 1000.0, 1000.0, 100.0, 1000.1);
+
+    return kp.component_mul(&err_position_orientation) + ki.component_mul(&self.error) + kd.component_mul(&derv_error);
 }
 }
